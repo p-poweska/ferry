@@ -39,6 +39,24 @@ struct FileDragViewTests {
         #expect(view.draggingEntered(info) == [])
     }
 
+    @Test func reportsPressAndClickWhenTheMouseDoesNotDrag() {
+        var events: [String] = []
+        view.onMouseDown = { _ in events.append("down") }
+        view.onClick = { _ in events.append("click") }
+
+        view.mouseDown(with: mouseEvent(.leftMouseDown))
+        view.mouseUp(with: mouseEvent(.leftMouseUp))
+
+        #expect(events == ["down", "click"])
+    }
+
+    private func mouseEvent(_ type: NSEvent.EventType) -> NSEvent {
+        NSEvent.mouseEvent(
+            with: type, location: .zero, modifierFlags: [], timestamp: 0, windowNumber: 0,
+            context: nil, eventNumber: 0, clickCount: 1, pressure: 1
+        )!
+    }
+
     @Test func letsFilesBeMovedOnlyOutsideTheApp() {
         let outside = FileDragView.dragOutOperations(for: .outsideApplication)
         #expect(outside.contains(.move))

@@ -1,15 +1,20 @@
 import AppKit
 import SwiftUI
 
-/// Transparent AppKit layer over the shelf's drop zone. It accepts files
-/// dropped onto the shelf and starts a multi-file drag back out, which
-/// SwiftUI's own drag and drop can't do on macOS.
+/// Transparent AppKit layer over the shelf's pile or one of its file rows.
+/// It accepts files dropped onto the shelf and starts a multi-file drag back
+/// out, which SwiftUI's own drag and drop can't do on macOS.
 struct FileDragArea: NSViewRepresentable {
-    var urls: [URL]
+    /// The files to take along, asked for when a drag starts.
+    var urls: () -> [URL]
     var onDrop: ([URL]) -> Void
     var onTargetingChange: (Bool) -> Void
-    var onDragOutChange: (Bool) -> Void
-    var onDragOutComplete: ([URL]) -> Void
+    var onMouseDown: (NSEvent) -> Void = { _ in }
+    /// A mouse up that didn't turn into a drag.
+    var onClick: (NSEvent) -> Void = { _ in }
+    var onDragOutBegan: ([URL]) -> Void
+    /// The dragged files, and whether they were dropped somewhere.
+    var onDragOutEnded: ([URL], Bool) -> Void
     var menu: () -> NSMenu?
 
     func makeNSView(context: Context) -> FileDragView {
@@ -20,18 +25,22 @@ struct FileDragArea: NSViewRepresentable {
         view.urls = urls
         view.onDrop = onDrop
         view.onTargetingChange = onTargetingChange
-        view.onDragOutChange = onDragOutChange
-        view.onDragOutComplete = onDragOutComplete
+        view.onMouseDown = onMouseDown
+        view.onClick = onClick
+        view.onDragOutBegan = onDragOutBegan
+        view.onDragOutEnded = onDragOutEnded
         view.menuProvider = menu
     }
 }
 
 final class FileDragView: NSView, NSDraggingSource {
-    var urls: [URL] = []
+    var urls: () -> [URL] = { [] }
     var onDrop: ([URL]) -> Void = { _ in }
     var onTargetingChange: (Bool) -> Void = { _ in }
-    var onDragOutChange: (Bool) -> Void = { _ in }
-    var onDragOutComplete: ([URL]) -> Void = { _ in }
+    var onMouseDown: (NSEvent) -> Void = { _ in }
+    var onClick: (NSEvent) -> Void = { _ in }
+    var onDragOutBegan: ([URL]) -> Void = { _ in }
+    var onDragOutEnded: ([URL], Bool) -> Void = { _, _ in }
     var menuProvider: () -> NSMenu? = { nil }
 
     private var mouseDownEvent: NSEvent?
@@ -104,9 +113,13 @@ final class FileDragView: NSView, NSDraggingSource {
 
     override func mouseDown(with event: NSEvent) {
         mouseDownEvent = event
+        onMouseDown(event)
     }
 
     override func mouseUp(with event: NSEvent) {
+        if mouseDownEvent != nil {
+            onClick(event)
+        }
         mouseDownEvent = nil
     }
 
@@ -120,14 +133,14 @@ final class FileDragView: NSView, NSDraggingSource {
     }
 
     private func beginDragOut(with event: NSEvent) {
-        guard !urls.isEmpty else { return }
-        draggedURLs = urls
+        draggedURLs = urls()
+        guard !draggedURLs.isEmpty else { return }
 
         let side: CGFloat = 64
         let point = convert(event.locationInWindow, from: nil)
         let frame = NSRect(x: point.x - side / 2, y: point.y - side / 2, width: side, height: side)
         // Topmost card first, matching the stack shown on the shelf.
-        let items = urls.reversed().map { url in
+        let items = draggedURLs.reversed().map { url in
             let item = NSDraggingItem(pasteboardWriter: url as NSURL)
             item.setDraggingFrame(frame, contents: Thumbnails.cached(for: url)?.image ?? Thumbnails.icon(for: url))
             return item
@@ -152,7 +165,7 @@ final class FileDragView: NSView, NSDraggingSource {
     }
 
     func draggingSession(_ session: NSDraggingSession, willBeginAt screenPoint: NSPoint) {
-        onDragOutChange(true)
+        onDragOutBegan(draggedURLs)
     }
 
     func draggingSession(
@@ -160,10 +173,7 @@ final class FileDragView: NSView, NSDraggingSource {
         endedAt screenPoint: NSPoint,
         operation: NSDragOperation
     ) {
-        onDragOutChange(false)
-        if operation != [] {
-            onDragOutComplete(draggedURLs)
-        }
+        onDragOutEnded(draggedURLs, operation != [])
         draggedURLs = []
     }
 }
