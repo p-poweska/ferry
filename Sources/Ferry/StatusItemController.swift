@@ -7,10 +7,12 @@ final class StatusItemController: NSObject, NSMenuDelegate {
     private let statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
     private let shelf: Shelf
     private let panel: ShelfPanelController
+    private let dragMonitor: DragMonitor
 
-    init(shelf: Shelf, panel: ShelfPanelController) {
+    init(shelf: Shelf, panel: ShelfPanelController, dragMonitor: DragMonitor) {
         self.shelf = shelf
         self.panel = panel
+        self.dragMonitor = dragMonitor
         super.init()
 
         let menu = NSMenu()
@@ -53,6 +55,14 @@ final class StatusItemController: NSObject, NSMenuDelegate {
         })
 
         menu.addItem(.separator())
+        menu.addItem(MenuItem("Show While Dragging Files", isOn: Preferences.showWhileDragging) { [dragMonitor] in
+            Preferences.showWhileDragging.toggle()
+            if Preferences.showWhileDragging {
+                dragMonitor.start()
+            } else {
+                dragMonitor.stop()
+            }
+        })
         menu.addItem(MenuItem("Launch at Login", isOn: LaunchAtLogin.isEnabled) {
             LaunchAtLogin.toggle()
         })

@@ -10,6 +10,8 @@ final class ShelfPanelController: NSObject, NSWindowDelegate {
     private let shelf: Shelf
     private let panel = ShelfPanel(size: ShelfView.size)
     private var isAnimating = false
+    /// Popped up by a file drag elsewhere rather than opened by the user.
+    private var isShownForDrag = false
 
     private(set) var isVisible = false
 
@@ -56,6 +58,7 @@ final class ShelfPanelController: NSObject, NSWindowDelegate {
     }
 
     func hide() {
+        isShownForDrag = false
         guard isVisible else { return }
         isVisible = false
         NSAnimationContext.runAnimationGroup { context in
@@ -67,6 +70,26 @@ final class ShelfPanelController: NSObject, NSWindowDelegate {
                 // Shown again while fading out: keep it on screen.
                 guard !self.isVisible else { return }
                 self.panel.orderOut(nil)
+            }
+        }
+    }
+
+    func fileDragBegan() {
+        guard !isVisible else { return }
+        isShownForDrag = true
+        show()
+    }
+
+    func fileDragEnded() {
+        guard isShownForDrag else { return }
+        // The drop reaches the shelf a moment after the drag source sees the
+        // mouse go up, so wait before deciding the shelf wasn't used.
+        Task { [weak self] in
+            try? await Task.sleep(for: .milliseconds(400))
+            guard let self, self.isShownForDrag else { return }
+            self.isShownForDrag = false
+            if self.shelf.isEmpty {
+                self.hide()
             }
         }
     }
