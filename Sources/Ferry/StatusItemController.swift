@@ -6,9 +6,11 @@ import AppKit
 final class StatusItemController: NSObject, NSMenuDelegate {
     private let statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
     private let shelf: Shelf
+    private let panel: ShelfPanelController
 
-    init(shelf: Shelf) {
+    init(shelf: Shelf, panel: ShelfPanelController) {
         self.shelf = shelf
+        self.panel = panel
         super.init()
 
         let menu = NSMenu()
@@ -43,6 +45,9 @@ final class StatusItemController: NSObject, NSMenuDelegate {
 
         let count = shelf.items.count
         menu.addItem(.sectionHeader(title: count > 0 ? "\(Self.itemCount(count)) on the shelf" : "Shelf is empty"))
+        menu.addItem(MenuItem(panel.isVisible ? "Hide Shelf" : "Show Shelf", symbol: "tray") { [panel] in
+            panel.toggle()
+        })
         menu.addItem(MenuItem("Clear Shelf", symbol: "xmark.circle", isEnabled: count > 0) { [shelf] in
             shelf.removeAll()
         })
