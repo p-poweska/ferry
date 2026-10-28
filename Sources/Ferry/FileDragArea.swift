@@ -142,8 +142,12 @@ final class FileDragView: NSView, NSDraggingSource {
         _ session: NSDraggingSession,
         sourceOperationMaskFor context: NSDraggingContext
     ) -> NSDragOperation {
-        // Finder moves on the same volume and copies across volumes; holding
-        // Option forces a copy, just like dragging from a Finder window.
+        Self.dragOutOperations(for: context)
+    }
+
+    /// Finder moves on the same volume and copies across volumes; holding
+    /// Option forces a copy, just like dragging from a Finder window.
+    static func dragOutOperations(for context: NSDraggingContext) -> NSDragOperation {
         context == .outsideApplication ? [.move, .copy, .generic, .delete] : []
     }
 
