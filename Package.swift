@@ -9,5 +9,10 @@ let package = Package(
             name: "Ferry",
             path: "Sources/Ferry"
         ),
+        .testTarget(
+            name: "FerryTests",
+            dependencies: ["Ferry"],
+            path: "Tests/FerryTests"
+        ),
     ]
 )
