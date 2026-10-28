@@ -9,7 +9,6 @@ final class ShelfPanelController: NSObject, NSWindowDelegate {
 
     private let shelf: Shelf
     private let panel = ShelfPanel(size: ShelfView.size)
-    private var isAnimating = false
     /// Popped up by a file drag elsewhere rather than opened by the user.
     private var isShownForDrag = false
 
@@ -41,7 +40,7 @@ final class ShelfPanelController: NSObject, NSWindowDelegate {
         isVisible = true
 
         let frame = targetFrame()
-        isAnimating = true
+        panel.wasMovedByUser = false
         panel.setFrame(frame.offsetBy(dx: 18, dy: 0), display: false)
         panel.alphaValue = 0
         panel.orderFrontRegardless()
@@ -50,17 +49,13 @@ final class ShelfPanelController: NSObject, NSWindowDelegate {
             context.timingFunction = CAMediaTimingFunction(name: .easeOut)
             panel.animator().setFrame(frame, display: true)
             panel.animator().alphaValue = 1
-        } completionHandler: {
-            MainActor.assumeIsolated {
-                self.isAnimating = false
-            }
         }
     }
 
     func hide() {
-        isShownForDrag = false
         guard isVisible else { return }
         isVisible = false
+        isShownForDrag = false
         NSAnimationContext.runAnimationGroup { context in
             context.duration = 0.18
             context.timingFunction = CAMediaTimingFunction(name: .easeIn)
@@ -129,7 +124,7 @@ final class ShelfPanelController: NSObject, NSWindowDelegate {
     }
 
     func windowDidMove(_ notification: Notification) {
-        guard isVisible, !isAnimating else { return }
+        guard panel.wasMovedByUser else { return }
         customOrigin = panel.frame.origin
     }
 }

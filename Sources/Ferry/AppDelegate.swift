@@ -22,4 +22,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             dragMonitor.start()
         }
     }
+
+    /// Opening Ferry again while it's running brings up the shelf.
+    func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows flag: Bool) -> Bool {
+        panel.show()
+        return false
+    }
 }

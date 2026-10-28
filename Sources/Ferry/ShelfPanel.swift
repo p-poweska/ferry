@@ -5,6 +5,9 @@ import AppKit
 final class ShelfPanel: NSPanel {
     static let cornerRadius: CGFloat = 22
 
+    /// Set when the user drags the panel around, as opposed to Ferry moving it.
+    var wasMovedByUser = false
+
     init(size: NSSize) {
         super.init(
             contentRect: NSRect(origin: .zero, size: size),
@@ -26,6 +29,11 @@ final class ShelfPanel: NSPanel {
 
     override var canBecomeKey: Bool { true }
     override var canBecomeMain: Bool { false }
+
+    override func performDrag(with event: NSEvent) {
+        wasMovedByUser = true
+        super.performDrag(with: event)
+    }
 
     /// Wraps `content` in a translucent, rounded background: Liquid Glass where
     /// available, a vibrant blur otherwise.
