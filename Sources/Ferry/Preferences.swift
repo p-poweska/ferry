@@ -58,11 +58,8 @@ final class Preferences {
     init(defaults: UserDefaults = .standard) {
         self.defaults = defaults
         showWhileDragging = defaults.object(forKey: Key.showWhileDragging) as? Bool ?? true
-        let customOrigin = defaults.string(forKey: Key.customOrigin).map(NSPointFromString)
-        self.customOrigin = customOrigin
-        // Before there was a choice, a dragged shelf simply stayed put.
-        position = defaults.string(forKey: Key.position).flatMap(ShelfPosition.init)
-            ?? (customOrigin == nil ? .rightEdge : .custom)
+        customOrigin = defaults.string(forKey: Key.customOrigin).map(NSPointFromString)
+        position = defaults.string(forKey: Key.position).flatMap(ShelfPosition.init) ?? .rightEdge
         shortcut = defaults.data(forKey: Key.shortcut).map { try? JSONDecoder().decode(KeyShortcut.self, from: $0) }
             ?? .standard
     }

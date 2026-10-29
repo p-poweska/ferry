@@ -41,6 +41,16 @@ struct ShelfPositionTests {
         #expect(frame(.custom, customOrigin: NSPoint(x: 3000, y: 100)) == frame(.rightEdge))
         #expect(frame(.custom) == frame(.rightEdge))
     }
+
+    /// The image being dragged would hide a shelf that opens under it.
+    @Test func staysClearOfThePointer() {
+        // Along the edge, to whichever side of the pointer is closer.
+        #expect(frame(.rightEdge, mouse: NSPoint(x: 900, y: 400)).origin == NSPoint(x: 784, y: 160))
+        #expect(frame(.rightEdge, mouse: NSPoint(x: 900, y: 300)).origin == NSPoint(x: 784, y: 340))
+        #expect(frame(.topEdge, mouse: NSPoint(x: 500, y: 700)).origin == NSPoint(x: 260, y: 554))
+        // Next to the pointer when it's at the user's own spot.
+        #expect(frame(.custom, customOrigin: NSPoint(x: 400, y: 300)) == frame(.pointer))
+    }
 }
 
 @MainActor
@@ -64,9 +74,13 @@ struct PreferencesTests {
         defaults.removePersistentDomain(forName: suite)
     }
 
-    @Test func keepsAShelfThatWasDraggedBeforePositionsExisted() {
+    /// Older versions saved wherever the shelf was last dragged, often by
+    /// accident, so that spot is only offered, not picked.
+    @Test func startsAtTheRightEdgeAfterAnOlderVersion() {
         defaults.set(NSStringFromPoint(NSPoint(x: 10, y: 20)), forKey: "ShelfOrigin")
-        #expect(Preferences(defaults: defaults).position == .custom)
+        let preferences = Preferences(defaults: defaults)
+        #expect(preferences.position == .rightEdge)
+        #expect(preferences.customOrigin == NSPoint(x: 10, y: 20))
         defaults.removePersistentDomain(forName: suite)
     }
 
