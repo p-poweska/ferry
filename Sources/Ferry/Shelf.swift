@@ -1,4 +1,4 @@
-import Foundation
+import AppKit
 import Observation
 
 /// A file parked on the shelf. Ferry only keeps a reference: the file stays
@@ -30,10 +30,20 @@ struct ShelfItem: Identifiable, Hashable {
 final class Shelf {
     private(set) var items: [ShelfItem] = []
 
-    /// Called after every change to `items`.
+    /// Promised files that haven't arrived yet.
+    private(set) var incomingCount = 0 {
+        didSet {
+            if incomingCount != oldValue {
+                onChange?()
+            }
+        }
+    }
+
+    /// Called after every change to `items` or `incomingCount`.
     @ObservationIgnored var onChange: (() -> Void)?
 
     var isEmpty: Bool { items.isEmpty }
+    var isReceiving: Bool { incomingCount > 0 }
     var urls: [URL] { items.map(\.url) }
 
     func add(_ urls: [URL]) {
@@ -44,6 +54,27 @@ final class Shelf {
                 .filter { known.insert($0).inserted }
             items.append(contentsOf: added.map(ShelfItem.init))
         }
+    }
+
+    /// Files another app promised to write, like photos from Photos, images
+    /// from a browser or attachments from Mail. They land in the inbox and
+    /// join the shelf as they arrive.
+    func receive(_ promises: [NSFilePromiseReceiver]) {
+        for promise in promises {
+            incomingCount += max(promise.fileNames.count, 1)
+            Inbox.receive(promise) { [weak self] url in
+                self?.promisedFileArrived(url)
+            }
+        }
+    }
+
+    /// `nil` when the other app couldn't deliver the file.
+    private func promisedFileArrived(_ url: URL?) {
+        // Add it before counting down, so the shelf never looks empty in between.
+        if let url {
+            add([url])
+        }
+        incomingCount = max(incomingCount - 1, 0)
     }
 
     func remove(_ urls: [URL]) {

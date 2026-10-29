@@ -2,12 +2,14 @@ import AppKit
 import SwiftUI
 
 /// Transparent AppKit layer over the shelf's pile or one of its file rows.
-/// It accepts files dropped onto the shelf and starts a multi-file drag back
-/// out, which SwiftUI's own drag and drop can't do on macOS.
+/// It accepts files dropped onto the shelf, including ones other apps only
+/// promise to write, and starts a multi-file drag back out, which SwiftUI's
+/// own drag and drop can't do on macOS.
 struct FileDragArea: NSViewRepresentable {
     /// The files to take along, asked for when a drag starts.
     var urls: () -> [URL]
-    var onDrop: ([URL]) -> Void
+    /// Dropped files, and promises of files still to be written.
+    var onDrop: ([URL], [NSFilePromiseReceiver]) -> Void
     var onTargetingChange: (Bool) -> Void
     var onMouseDown: (NSEvent) -> Void = { _ in }
     /// A mouse up that didn't turn into a drag.
@@ -35,7 +37,7 @@ struct FileDragArea: NSViewRepresentable {
 
 final class FileDragView: NSView, NSDraggingSource {
     var urls: () -> [URL] = { [] }
-    var onDrop: ([URL]) -> Void = { _ in }
+    var onDrop: ([URL], [NSFilePromiseReceiver]) -> Void = { _, _ in }
     var onTargetingChange: (Bool) -> Void = { _ in }
     var onMouseDown: (NSEvent) -> Void = { _ in }
     var onClick: (NSEvent) -> Void = { _ in }
@@ -48,7 +50,8 @@ final class FileDragView: NSView, NSDraggingSource {
 
     override init(frame: NSRect) {
         super.init(frame: frame)
-        registerForDraggedTypes([.fileURL])
+        let promises = NSFilePromiseReceiver.readableDraggedTypes.map { NSPasteboard.PasteboardType($0) }
+        registerForDraggedTypes([.fileURL] + promises)
     }
 
     @available(*, unavailable)
@@ -65,15 +68,8 @@ final class FileDragView: NSView, NSDraggingSource {
 
     // MARK: - Dropping files onto the shelf
 
-    private func fileURLs(on pasteboard: NSPasteboard) -> [URL] {
-        let options: [NSPasteboard.ReadingOptionKey: Any] = [.urlReadingFileURLsOnly: true]
-        return pasteboard.readObjects(forClasses: [NSURL.self], options: options) as? [URL] ?? []
-    }
-
     private func operation(for info: NSDraggingInfo) -> NSDragOperation {
-        guard info.draggingSource as AnyObject? !== self,
-              !fileURLs(on: info.draggingPasteboard).isEmpty
-        else { return [] }
+        guard info.draggingSource as AnyObject? !== self, info.draggingPasteboard.hasFiles else { return [] }
         // The shelf only remembers where files are, so ask the source for a
         // plain drop instead of a copy or a move.
         let preferred: [NSDragOperation] = [.generic, .copy, .link]
@@ -103,9 +99,9 @@ final class FileDragView: NSView, NSDraggingSource {
     }
 
     override func performDragOperation(_ sender: NSDraggingInfo) -> Bool {
-        let urls = fileURLs(on: sender.draggingPasteboard)
-        guard !urls.isEmpty else { return false }
-        onDrop(urls)
+        let (urls, promises) = sender.draggingPasteboard.files()
+        guard !urls.isEmpty || !promises.isEmpty else { return false }
+        onDrop(urls, promises)
         return true
     }
 

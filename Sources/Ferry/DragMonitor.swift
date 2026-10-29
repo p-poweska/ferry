@@ -1,6 +1,7 @@
 import AppKit
 
-/// Notices when the user starts dragging files in any app.
+/// Notices when the user starts dragging files in any app, including photos,
+/// images and mail that apps promise to write as files on drop.
 ///
 /// Global mouse monitors don't need Accessibility access. A drag session
 /// writes to the shared drag pasteboard, so a change in its `changeCount`
@@ -50,10 +51,7 @@ final class DragMonitor {
     private func mouseDragged() {
         guard !isDragging, pasteboard.changeCount != changeCountAtMouseDown else { return }
         isDragging = true
-        isDraggingFiles = pasteboard.canReadObject(
-            forClasses: [NSURL.self],
-            options: [.urlReadingFileURLsOnly: true]
-        )
+        isDraggingFiles = pasteboard.hasFiles
         if isDraggingFiles {
             onFileDragBegan()
         }

@@ -24,6 +24,7 @@ struct ShelfView: View {
             dropZone
             ShelfFooter(
                 items: shelf.items,
+                isReceiving: shelf.isReceiving,
                 selection: showsList ? selection : nil,
                 onToggleList: { isExpanded.toggle() },
                 onClose: onClose
@@ -58,7 +59,7 @@ struct ShelfView: View {
             )
 
             if shelf.isEmpty {
-                EmptyShelfPrompt(isTargeted: isTargeted)
+                EmptyShelfPrompt(isTargeted: isTargeted, isReceiving: shelf.isReceiving)
                     .transition(.opacity)
             } else if showsList {
                 fileList
@@ -187,7 +188,10 @@ struct ShelfView: View {
     ) -> FileDragArea {
         FileDragArea(
             urls: urls,
-            onDrop: { shelf.add($0) },
+            onDrop: { urls, promises in
+                shelf.add(urls)
+                shelf.receive(promises)
+            },
             onTargetingChange: { isTargeted = $0 },
             onMouseDown: onMouseDown,
             onClick: onClick,
@@ -220,18 +224,30 @@ struct ShelfView: View {
 
 private struct EmptyShelfPrompt: View {
     let isTargeted: Bool
+    let isReceiving: Bool
 
     var body: some View {
         VStack(spacing: 8) {
-            Image(systemName: "tray.and.arrow.down")
-                .font(.system(size: 30, weight: .light))
-                .foregroundStyle(isTargeted ? Color.accentColor : Color.secondary)
-                .symbolEffect(.bounce, value: isTargeted)
-            Text(isTargeted ? "Release to add" : "Drop files here")
+            if isReceiving && !isTargeted {
+                ProgressView()
+                    .controlSize(.regular)
+                    .frame(height: 36)
+            } else {
+                Image(systemName: "tray.and.arrow.down")
+                    .font(.system(size: 30, weight: .light))
+                    .foregroundStyle(isTargeted ? Color.accentColor : Color.secondary)
+                    .symbolEffect(.bounce, value: isTargeted)
+            }
+            Text(message)
                 .font(.system(size: 12, weight: .medium))
                 .foregroundStyle(.secondary)
                 .contentTransition(.opacity)
         }
+    }
+
+    private var message: String {
+        if isTargeted { return "Release to add" }
+        return isReceiving ? "Receiving…" : "Drop files here"
     }
 }
 
@@ -366,6 +382,7 @@ private struct CountBadge: View {
 
 private struct ShelfFooter: View {
     let items: [ShelfItem]
+    let isReceiving: Bool
     /// Set while the file list is showing.
     let selection: FileSelection?
     var onToggleList: () -> Void
@@ -415,6 +432,9 @@ private struct ShelfFooter: View {
     }
 
     private var subtitle: String {
+        if isReceiving && !items.isEmpty {
+            return "Receiving…"
+        }
         switch items.count {
         case 0: return "Drop, switch, drag out"
         case 1: return items[0].detail

@@ -11,6 +11,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private lazy var settings = SettingsWindowController(preferences: preferences, hotKey: hotKey)
 
     func applicationDidFinishLaunching(_ notification: Notification) {
+        Inbox.empty()
         panel = ShelfPanelController(shelf: shelf, preferences: preferences)
         statusItem = StatusItemController(shelf: shelf, panel: panel, preferences: preferences) { [weak self] in
             self?.settings.show()

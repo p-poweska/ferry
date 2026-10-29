@@ -77,14 +77,16 @@ final class ShelfPanelController: NSObject, NSWindowDelegate {
             try? await Task.sleep(for: .milliseconds(400))
             guard let self, self.isShownForDrag else { return }
             self.isShownForDrag = false
-            if self.shelf.isEmpty {
-                self.hide()
-            }
+            self.hideIfUnused()
         }
     }
 
     func shelfDidChange() {
-        if shelf.isEmpty {
+        hideIfUnused()
+    }
+
+    private func hideIfUnused() {
+        if shelf.isEmpty && !shelf.isReceiving {
             hide()
         }
     }
