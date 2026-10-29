@@ -10,7 +10,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private lazy var settings = SettingsWindowController(preferences: preferences)
 
     func applicationDidFinishLaunching(_ notification: Notification) {
-        panel = ShelfPanelController(shelf: shelf)
+        panel = ShelfPanelController(shelf: shelf, preferences: preferences)
         statusItem = StatusItemController(shelf: shelf, panel: panel) { [weak self] in
             self?.settings.show()
         }
@@ -39,6 +39,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             } else {
                 dragMonitor.stop()
             }
+        case .position:
+            panel.positionDidChange()
         }
     }
 

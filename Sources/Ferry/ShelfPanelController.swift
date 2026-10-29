@@ -4,24 +4,17 @@ import SwiftUI
 /// Shows, hides and positions the shelf panel.
 @MainActor
 final class ShelfPanelController: NSObject, NSWindowDelegate {
-    private static let originKey = "ShelfOrigin"
-    private static let screenMargin: CGFloat = 16
-
     private let shelf: Shelf
+    private let preferences: Preferences
     private let panel = ShelfPanel(size: ShelfView.size)
     /// Popped up by a file drag elsewhere rather than opened by the user.
     private var isShownForDrag = false
 
     private(set) var isVisible = false
 
-    /// Where the user last dragged the shelf to, if anywhere.
-    private var customOrigin: NSPoint? {
-        get { UserDefaults.standard.string(forKey: Self.originKey).map(NSPointFromString) }
-        set { UserDefaults.standard.set(newValue.map(NSStringFromPoint), forKey: Self.originKey) }
-    }
-
-    init(shelf: Shelf) {
+    init(shelf: Shelf, preferences: Preferences) {
         self.shelf = shelf
+        self.preferences = preferences
         super.init()
         let root = ShelfView(shelf: shelf) { [weak self] in
             self?.closeButtonClicked()
@@ -40,8 +33,9 @@ final class ShelfPanelController: NSObject, NSWindowDelegate {
         isVisible = true
 
         let frame = targetFrame()
+        let slide = preferences.position.slideOffset
         panel.wasMovedByUser = false
-        panel.setFrame(frame.offsetBy(dx: 18, dy: 0), display: false)
+        panel.setFrame(frame.offsetBy(dx: slide.dx, dy: slide.dy), display: false)
         panel.alphaValue = 0
         panel.orderFrontRegardless()
         NSAnimationContext.runAnimationGroup { context in
@@ -102,29 +96,30 @@ final class ShelfPanelController: NSObject, NSWindowDelegate {
 
     // MARK: - Positioning
 
-    /// The user's spot if it still fits on a screen, otherwise the right edge
-    /// of the screen under the mouse.
-    private func targetFrame() -> NSRect {
-        let size = panel.frame.size
-        if let origin = customOrigin {
-            let frame = NSRect(origin: origin, size: size)
-            if NSScreen.screens.contains(where: { $0.visibleFrame.contains(frame) }) {
-                return frame
-            }
+    /// Moves a visible shelf to its new spot as soon as the setting changes.
+    func positionDidChange() {
+        // Dragging the shelf around picks "Your Spot", and it's already there.
+        guard isVisible, !(preferences.position == .custom && panel.wasMovedByUser) else { return }
+        panel.wasMovedByUser = false
+        NSAnimationContext.runAnimationGroup { context in
+            context.duration = 0.3
+            context.timingFunction = CAMediaTimingFunction(name: .easeInEaseOut)
+            panel.animator().setFrame(targetFrame(), display: true)
         }
-        let mouse = NSEvent.mouseLocation
-        let screen = NSScreen.screens.first { $0.frame.contains(mouse) } ?? NSScreen.main
-        let visible = screen?.visibleFrame ?? .zero
-        return NSRect(
-            x: visible.maxX - size.width - Self.screenMargin,
-            y: visible.midY - size.height / 2,
-            width: size.width,
-            height: size.height
+    }
+
+    private func targetFrame() -> NSRect {
+        preferences.position.frame(
+            size: panel.frame.size,
+            mouse: NSEvent.mouseLocation,
+            customOrigin: preferences.customOrigin,
+            screens: NSScreen.screens.map(ShelfPosition.Screen.init)
         )
     }
 
     func windowDidMove(_ notification: Notification) {
         guard panel.wasMovedByUser else { return }
-        customOrigin = panel.frame.origin
+        preferences.customOrigin = panel.frame.origin
+        preferences.position = .custom
     }
 }
