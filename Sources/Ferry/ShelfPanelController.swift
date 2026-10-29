@@ -9,6 +9,7 @@ final class ShelfPanelController: NSObject, NSWindowDelegate {
     private let panel = ShelfPanel(size: ShelfView.size)
     /// Popped up by a file drag elsewhere rather than opened by the user.
     private var isShownForDrag = false
+    private var hideAfterDrag: Task<Void, Never>?
 
     private(set) var isVisible = false
 
@@ -64,6 +65,8 @@ final class ShelfPanelController: NSObject, NSWindowDelegate {
     }
 
     func fileDragBegan() {
+        // The next drag started before the last one's shelf went away.
+        hideAfterDrag?.cancel()
         guard !isVisible else { return }
         isShownForDrag = true
         show()
@@ -73,9 +76,9 @@ final class ShelfPanelController: NSObject, NSWindowDelegate {
         guard isShownForDrag else { return }
         // The drop reaches the shelf a moment after the drag source sees the
         // mouse go up, so wait before deciding the shelf wasn't used.
-        Task { [weak self] in
+        hideAfterDrag = Task { [weak self] in
             try? await Task.sleep(for: .milliseconds(400))
-            guard let self, self.isShownForDrag else { return }
+            guard let self, !Task.isCancelled, self.isShownForDrag else { return }
             self.isShownForDrag = false
             self.hideIfUnused()
         }
