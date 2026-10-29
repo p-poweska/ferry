@@ -14,7 +14,9 @@ files on it, switch desktops, and drag them out where they belong.
 
 ## How it works
 
-1. Start dragging files in Finder. The shelf slides in at the right edge of the screen.
+1. Start dragging files in Finder, or photos, images and mail from Photos, your
+   browser or Mail. The shelf slides in at the edge of the screen (or press
+   <kbd>⌃</kbd> <kbd>⌥</kbd> <kbd>F</kbd> to bring it up yourself).
 2. Drop them on the shelf.
 3. Switch to another desktop (<kbd>⌃</kbd> <kbd>←</kbd> / <kbd>→</kbd> or a swipe). The shelf comes along.
 4. Drag the pile out to its destination. Finder moves the files on the same disk
@@ -26,7 +28,10 @@ each file. Drag a single row out on its own, or tick a few with the circles
 The rest stay on the shelf for the next stop.
 
 Ferry only keeps references. Files stay where they are until you drag them out,
-and they leave the shelf as soon as they land somewhere else.
+and they leave the shelf as soon as they land somewhere else. Photos, browsers
+and Mail don't hand over a file, only a promise to write one, so Ferry has them
+write it to a `Ferry Inbox` folder in the temporary directory first; it's
+emptied the next time Ferry starts.
 
 ## Features
 
@@ -40,12 +45,18 @@ and they leave the shelf as soon as they land somewhere else.
   Finder-style ⌘/⇧ selection. Double-click a row to open the file.
 - Right-click to open files, show them in Finder, remove them from the shelf or
   clear it.
-- Drag the shelf by its edge to put it anywhere; Ferry remembers the spot.
-- Menu bar menu: show or hide the shelf, clear it, turn off "Show While Dragging
-  Files", launch at login.
+- Takes photos from Photos, images from Safari and other browsers, and messages
+  and attachments from Mail.
+- A global shortcut, <kbd>⌃</kbd> <kbd>⌥</kbd> <kbd>F</kbd> by default, shows
+  and hides the shelf from any app.
+- Pick where the shelf appears: the right, left, top or bottom edge, next to the
+  pointer, or anywhere you drag it by its edge.
+- Settings (<kbd>⌘</kbd> <kbd>,</kbd> from the menu bar menu): show while
+  dragging, the shortcut, the position, launch at login.
 
-Ferry needs no permissions: it watches for drags with a global mouse monitor,
-which doesn't require Accessibility access.
+Ferry needs no permissions: it watches for drags with a global mouse monitor
+and registers its shortcut as a Carbon hot key, and neither requires
+Accessibility access.
 
 ## Build and run
 
@@ -80,8 +91,13 @@ To work on it in Xcode, open `Package.swift`.
 | `Sources/Ferry/ShelfView.swift` | The SwiftUI shelf: drop zone, pile, file list, footer |
 | `Sources/Ferry/FileDragArea.swift` | AppKit drop target and multi-file drag source |
 | `Sources/Ferry/FileSelection.swift` | Finder-style selection for the file list |
+| `Sources/Ferry/Inbox.swift` | Receives files promised by Photos, browsers and Mail |
 | `Sources/Ferry/DragMonitor.swift` | Detects file drags in other apps |
 | `Sources/Ferry/StatusItemController.swift` | Menu bar icon and menu |
+| `Sources/Ferry/Preferences.swift` | Saved settings |
+| `Sources/Ferry/ShelfPosition.swift` | Where on screen the shelf appears |
+| `Sources/Ferry/GlobalHotKey.swift`, `KeyShortcut.swift` | The show/hide shortcut |
+| `Sources/Ferry/SettingsView.swift`, `ShortcutRecorder.swift` | The settings window |
 | `scripts/build-app.sh` | Assembles and signs `Ferry.app` |
 | `scripts/make-icon.swift` | Draws the app icon (`swift scripts/make-icon.swift`) |
 
