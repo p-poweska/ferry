@@ -8,6 +8,11 @@ CONFIG="${CONFIG:-release}"
 APP="build/Ferry.app"
 ARCHS=(--arch arm64 --arch x86_64)
 
+# In an iCloud Drive folder like Documents, syncing the build products while
+# they are being replaced leaves copies like "Ferry 2.app" behind.
+mkdir -p build .build
+xattr -w "com.apple.fileprovider.ignore#P" 1 build .build
+
 swift build -c "$CONFIG" "${ARCHS[@]}"
 BIN_DIR="$(swift build -c "$CONFIG" "${ARCHS[@]}" --show-bin-path)"
 
