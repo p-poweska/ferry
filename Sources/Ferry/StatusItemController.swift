@@ -7,11 +7,13 @@ final class StatusItemController: NSObject, NSMenuDelegate {
     private let statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
     private let shelf: Shelf
     private let panel: ShelfPanelController
+    private let preferences: Preferences
     private let openSettings: () -> Void
 
-    init(shelf: Shelf, panel: ShelfPanelController, openSettings: @escaping () -> Void) {
+    init(shelf: Shelf, panel: ShelfPanelController, preferences: Preferences, openSettings: @escaping () -> Void) {
         self.shelf = shelf
         self.panel = panel
+        self.preferences = preferences
         self.openSettings = openSettings
         super.init()
 
@@ -47,9 +49,14 @@ final class StatusItemController: NSObject, NSMenuDelegate {
 
         let count = shelf.items.count
         menu.addItem(.sectionHeader(title: count > 0 ? "\(Self.itemCount(count)) on the shelf" : "Shelf is empty"))
-        menu.addItem(MenuItem(panel.isVisible ? "Hide Shelf" : "Show Shelf", symbol: "tray") { [panel] in
+        let toggle = MenuItem(panel.isVisible ? "Hide Shelf" : "Show Shelf", symbol: "tray") { [panel] in
             panel.toggle()
-        })
+        }
+        if let shortcut = preferences.shortcut {
+            toggle.keyEquivalent = shortcut.keyEquivalent
+            toggle.keyEquivalentModifierMask = shortcut.modifiers
+        }
+        menu.addItem(toggle)
         menu.addItem(MenuItem("Clear Shelf", symbol: "xmark.circle", isEnabled: count > 0) { [shelf] in
             shelf.removeAll()
         })

@@ -5,13 +5,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private let shelf = Shelf()
     private let preferences = Preferences()
     private let dragMonitor = DragMonitor()
+    private let hotKey = GlobalHotKey()
     private var panel: ShelfPanelController!
     private var statusItem: StatusItemController!
-    private lazy var settings = SettingsWindowController(preferences: preferences)
+    private lazy var settings = SettingsWindowController(preferences: preferences, hotKey: hotKey)
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         panel = ShelfPanelController(shelf: shelf, preferences: preferences)
-        statusItem = StatusItemController(shelf: shelf, panel: panel) { [weak self] in
+        statusItem = StatusItemController(shelf: shelf, panel: panel, preferences: preferences) { [weak self] in
             self?.settings.show()
         }
 
@@ -25,6 +26,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         if preferences.showWhileDragging {
             dragMonitor.start()
         }
+
+        hotKey.onPress = { [weak self] in self?.panel.toggle() }
+        hotKey.register(preferences.shortcut)
 
         preferences.onChange = { [weak self] setting in
             self?.apply(setting)
@@ -41,6 +45,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             }
         case .position:
             panel.positionDidChange()
+        case .shortcut:
+            hotKey.register(preferences.shortcut)
         }
     }
 

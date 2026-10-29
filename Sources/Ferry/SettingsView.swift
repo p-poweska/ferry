@@ -2,6 +2,7 @@ import SwiftUI
 
 struct SettingsView: View {
     @Bindable var preferences: Preferences
+    let hotKey: GlobalHotKey
 
     @State private var launchAtLogin = LaunchAtLogin.isEnabled
 
@@ -11,6 +12,19 @@ struct SettingsView: View {
                 Toggle(isOn: $preferences.showWhileDragging) {
                     Text("Show while dragging files")
                     Text("Slides in as soon as you start dragging files in any app.")
+                }
+                LabeledContent {
+                    ShortcutRecorder(shortcut: $preferences.shortcut) { isRecording in
+                        hotKey.isPaused = isRecording
+                    }
+                } label: {
+                    Text("Keyboard shortcut")
+                    if hotKey.isTaken {
+                        Text("Another app is already using this shortcut.")
+                            .foregroundStyle(.red)
+                    } else {
+                        Text("Shows or hides the shelf from any app.")
+                    }
                 }
                 VStack(alignment: .leading, spacing: 12) {
                     VStack(alignment: .leading, spacing: 2) {

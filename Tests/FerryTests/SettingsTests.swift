@@ -70,6 +70,15 @@ struct PreferencesTests {
         defaults.removePersistentDomain(forName: suite)
     }
 
+    @Test func remembersATurnedOffShortcut() {
+        let preferences = Preferences(defaults: defaults)
+        #expect(preferences.shortcut == .standard)
+
+        preferences.shortcut = nil
+        #expect(Preferences(defaults: defaults).shortcut == nil)
+        defaults.removePersistentDomain(forName: suite)
+    }
+
     @Test func reportsOnlyRealChanges() {
         let preferences = Preferences(defaults: defaults)
         var changes: [Preferences.Setting] = []

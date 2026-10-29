@@ -9,12 +9,14 @@ final class Preferences {
     enum Setting {
         case showWhileDragging
         case position
+        case shortcut
     }
 
     private enum Key {
         static let showWhileDragging = "ShowWhileDragging"
         static let position = "ShelfPosition"
         static let customOrigin = "ShelfOrigin"
+        static let shortcut = "ShelfShortcut"
     }
 
     /// Called after a setting changes to a new value.
@@ -43,6 +45,16 @@ final class Preferences {
         }
     }
 
+    /// Shows or hides the shelf from any app; `nil` when turned off.
+    var shortcut: KeyShortcut? {
+        didSet {
+            // Empty data rather than nothing, so "off" isn't mistaken for "never set".
+            let data = shortcut.flatMap { try? JSONEncoder().encode($0) } ?? Data()
+            defaults.set(data, forKey: Key.shortcut)
+            notify(.shortcut, if: shortcut != oldValue)
+        }
+    }
+
     init(defaults: UserDefaults = .standard) {
         self.defaults = defaults
         showWhileDragging = defaults.object(forKey: Key.showWhileDragging) as? Bool ?? true
@@ -51,6 +63,8 @@ final class Preferences {
         // Before there was a choice, a dragged shelf simply stayed put.
         position = defaults.string(forKey: Key.position).flatMap(ShelfPosition.init)
             ?? (customOrigin == nil ? .rightEdge : .custom)
+        shortcut = defaults.data(forKey: Key.shortcut).map { try? JSONDecoder().decode(KeyShortcut.self, from: $0) }
+            ?? .standard
     }
 
     private func notify(_ setting: Setting, if changed: Bool) {

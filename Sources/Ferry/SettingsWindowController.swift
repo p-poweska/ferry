@@ -5,10 +5,12 @@ import SwiftUI
 @MainActor
 final class SettingsWindowController {
     private let preferences: Preferences
+    private let hotKey: GlobalHotKey
     private var window: NSWindow?
 
-    init(preferences: Preferences) {
+    init(preferences: Preferences, hotKey: GlobalHotKey) {
         self.preferences = preferences
+        self.hotKey = hotKey
     }
 
     func show() {
@@ -16,7 +18,7 @@ final class SettingsWindowController {
         if !window.isVisible {
             // Fresh content every time it opens, so it picks up changes made
             // elsewhere, like the login item in System Settings.
-            let controller = NSHostingController(rootView: SettingsView(preferences: preferences))
+            let controller = NSHostingController(rootView: SettingsView(preferences: preferences, hotKey: hotKey))
             window.contentViewController = controller
             window.setContentSize(controller.view.fittingSize)
             if self.window == nil {
