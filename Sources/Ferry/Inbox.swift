@@ -27,7 +27,16 @@ enum Inbox {
     static func receive(_ promise: NSFilePromiseReceiver, arrived: @escaping @MainActor @Sendable (URL?) -> Void) {
         let destination = folder.appending(path: UUID().uuidString, directoryHint: .isDirectory)
         try? FileManager.default.createDirectory(at: destination, withIntermediateDirectories: true)
-        promise.receivePromisedFiles(atDestination: destination, options: [:], operationQueue: queue) { url, error in
+        promise.receivePromisedFiles(atDestination: destination, options: [:], operationQueue: queue, reader: reader(arrived))
+    }
+
+    /// Runs on the queue the other app writes on, so unlike the rest of the
+    /// inbox it can't belong to the main actor; Swift would stop the app
+    /// there. It hands each file over to the main actor instead.
+    nonisolated static func reader(
+        _ arrived: @escaping @MainActor @Sendable (URL?) -> Void
+    ) -> @Sendable (URL, (any Error)?) -> Void {
+        { url, error in
             let file = error == nil ? url : nil
             Task { @MainActor in
                 arrived(file)
