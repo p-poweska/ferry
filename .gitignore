@@ -13,6 +13,6 @@ DerivedData/
 /windows/**/bin/
 /windows/**/obj/
 /windows/**/AppPackages/
-/windows/artifacts/
+/windows/publish/
 .vs/
 *.user
