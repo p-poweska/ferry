@@ -60,9 +60,11 @@ Accessibility access.
 
 ## Build and run
 
-Requires macOS 14 or later and Xcode 16 or later (Swift 6).
+Requires macOS 14 or later and Xcode 16 or later (Swift 6). The Mac app lives
+in `macos/`; run these from there:
 
 ```bash
+cd macos
 make run        # build build/Ferry.app and launch it
 make install    # copy it to /Applications and launch it
 make app        # just build build/Ferry.app
@@ -72,34 +74,34 @@ swift test      # run the unit tests
 The app is ad-hoc signed for local use. Install it to `/Applications` before
 turning on **Launch at Login**.
 
-To work on it in Xcode, open `Package.swift`.
+To work on it in Xcode, open `macos/Package.swift`.
 
 > **Note:** if the repository lives in an iCloud-synced folder (Desktop &
 > Documents), iCloud tags build products with Finder info and `codesign` refuses
 > to sign the test bundle. Build outside the synced folder, for example
-> `swift test --scratch-path /tmp/ferry-build`. `make app` already clears these
-> attributes.
+> `swift test --scratch-path /tmp/ferry-build`. `make app` already keeps
+> `macos/build` and `macos/.build` out of iCloud.
 
 ## Project layout
 
 | Path | What's inside |
 | --- | --- |
-| `Sources/Ferry/FerryApp.swift` | Entry point, runs as a menu bar–only app |
-| `Sources/Ferry/Shelf.swift` | The shelf model: parked files and their metadata |
-| `Sources/Ferry/ShelfPanel.swift` | Floating, non-activating panel on every Space |
-| `Sources/Ferry/ShelfPanelController.swift` | Showing, hiding and positioning the panel |
-| `Sources/Ferry/ShelfView.swift` | The SwiftUI shelf: drop zone, pile, file list, footer |
-| `Sources/Ferry/FileDragArea.swift` | AppKit drop target and multi-file drag source |
-| `Sources/Ferry/FileSelection.swift` | Finder-style selection for the file list |
-| `Sources/Ferry/Inbox.swift` | Receives files promised by Photos, browsers and Mail |
-| `Sources/Ferry/DragMonitor.swift` | Detects file drags in other apps |
-| `Sources/Ferry/StatusItemController.swift` | Menu bar icon and menu |
-| `Sources/Ferry/Preferences.swift` | Saved settings |
-| `Sources/Ferry/ShelfPosition.swift` | Where on screen the shelf appears |
-| `Sources/Ferry/GlobalHotKey.swift`, `KeyShortcut.swift` | The show/hide shortcut |
-| `Sources/Ferry/SettingsView.swift`, `ShortcutRecorder.swift` | The settings window |
-| `scripts/build-app.sh` | Assembles and signs `Ferry.app` |
-| `scripts/make-icon.swift` | Draws the app icon (`swift scripts/make-icon.swift`) |
+| `macos/Sources/Ferry/FerryApp.swift` | Entry point, runs as a menu bar–only app |
+| `macos/Sources/Ferry/Shelf.swift` | The shelf model: parked files and their metadata |
+| `macos/Sources/Ferry/ShelfPanel.swift` | Floating, non-activating panel on every Space |
+| `macos/Sources/Ferry/ShelfPanelController.swift` | Showing, hiding and positioning the panel |
+| `macos/Sources/Ferry/ShelfView.swift` | The SwiftUI shelf: drop zone, pile, file list, footer |
+| `macos/Sources/Ferry/FileDragArea.swift` | AppKit drop target and multi-file drag source |
+| `macos/Sources/Ferry/FileSelection.swift` | Finder-style selection for the file list |
+| `macos/Sources/Ferry/Inbox.swift` | Receives files promised by Photos, browsers and Mail |
+| `macos/Sources/Ferry/DragMonitor.swift` | Detects file drags in other apps |
+| `macos/Sources/Ferry/StatusItemController.swift` | Menu bar icon and menu |
+| `macos/Sources/Ferry/Preferences.swift` | Saved settings |
+| `macos/Sources/Ferry/ShelfPosition.swift` | Where on screen the shelf appears |
+| `macos/Sources/Ferry/GlobalHotKey.swift`, `KeyShortcut.swift` | The show/hide shortcut |
+| `macos/Sources/Ferry/SettingsView.swift`, `ShortcutRecorder.swift` | The settings window |
+| `macos/scripts/build-app.sh` | Assembles and signs `Ferry.app` |
+| `macos/scripts/make-icon.swift` | Draws the app icon (run `swift scripts/make-icon.swift` from `macos/`) |
 
 ## License
 

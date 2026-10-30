@@ -1,6 +1,7 @@
 #!/usr/bin/env swift
-// Draws the Ferry app icon and writes Resources/AppIcon.icns.
-// Usage: swift scripts/make-icon.swift
+// Draws the Ferry app icon. Writes Resources/AppIcon.icns for the Mac app and
+// the shared ../Resources/AppIcon.png.
+// Usage (from macos/): swift scripts/make-icon.swift
 import AppKit
 
 let canvas: CGFloat = 1024
@@ -112,5 +113,5 @@ iconutil.executableURL = URL(fileURLWithPath: "/usr/bin/iconutil")
 iconutil.arguments = ["-c", "icns", iconset.path, "-o", output.path]
 try iconutil.run()
 iconutil.waitUntilExit()
-try png(pixels: 512).write(to: root.appendingPathComponent("Resources/AppIcon.png"))
+try png(pixels: 512).write(to: root.appendingPathComponent("../Resources/AppIcon.png").standardizedFileURL)
 print("Wrote \(output.path)")

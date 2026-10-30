@@ -1,8 +1,18 @@
 .DS_Store
-/.build
-/build
-/.swiftpm
-/Packages
+
+# macOS app
+/macos/.build
+/macos/build
+/macos/.swiftpm
+/macos/Packages
 xcuserdata/
 DerivedData/
 *.xcodeproj
+
+# Windows app
+/windows/**/bin/
+/windows/**/obj/
+/windows/**/AppPackages/
+/windows/artifacts/
+.vs/
+*.user
