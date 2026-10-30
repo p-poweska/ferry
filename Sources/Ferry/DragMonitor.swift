@@ -11,15 +11,19 @@ final class DragMonitor {
     var onFileDragBegan: () -> Void = {}
     var onFileDragEnded: () -> Void = {}
 
-    private let pasteboard = NSPasteboard(name: .drag)
-    private var changeCountAtMouseDown = 0
-    private var isDragging = false
+    private let pasteboard: NSPasteboard
+    /// The pasteboard as it was last looked at.
+    private var checkedChangeCount = 0
     private var isDraggingFiles = false
     private var monitors: [Any] = []
 
+    init(pasteboard: NSPasteboard = NSPasteboard(name: .drag)) {
+        self.pasteboard = pasteboard
+    }
+
     func start() {
         guard monitors.isEmpty else { return }
-        changeCountAtMouseDown = pasteboard.changeCount
+        checkedChangeCount = pasteboard.changeCount
         monitors = [
             monitor(.leftMouseDown) { $0.mouseDown() },
             monitor(.leftMouseDragged) { $0.mouseDragged() },
@@ -30,7 +34,6 @@ final class DragMonitor {
     func stop() {
         monitors.forEach(NSEvent.removeMonitor)
         monitors = []
-        isDragging = false
         isDraggingFiles = false
     }
 
@@ -42,26 +45,26 @@ final class DragMonitor {
         }
     }
 
-    private func mouseDown() {
-        changeCountAtMouseDown = pasteboard.changeCount
-        isDragging = false
+    func mouseDown() {
+        checkedChangeCount = pasteboard.changeCount
         isDraggingFiles = false
     }
 
-    private func mouseDragged() {
-        guard !isDragging, pasteboard.changeCount != changeCountAtMouseDown else { return }
-        isDragging = true
+    func mouseDragged() {
+        // Safari empties the pasteboard first and adds the files a moment
+        // later, so look again every time it changes.
+        guard !isDraggingFiles, pasteboard.changeCount != checkedChangeCount else { return }
+        checkedChangeCount = pasteboard.changeCount
         isDraggingFiles = pasteboard.hasFiles
         if isDraggingFiles {
             onFileDragBegan()
         }
     }
 
-    private func mouseUp() {
+    func mouseUp() {
         if isDraggingFiles {
             onFileDragEnded()
         }
-        isDragging = false
         isDraggingFiles = false
     }
 }
