@@ -52,6 +52,20 @@ internal struct MSLLHOOKSTRUCT
     public nuint ExtraInfo;
 }
 
+[StructLayout(LayoutKind.Sequential)]
+internal struct GUITHREADINFO
+{
+    public uint Size;
+    public uint Flags;
+    public nint Active;
+    public nint Focus;
+    public nint Capture;
+    public nint MenuOwner;
+    public nint MoveSize;
+    public nint Caret;
+    public RECT CaretRect;
+}
+
 /// <summary>The header of a CF_HDROP block; the paths follow it.</summary>
 [StructLayout(LayoutKind.Sequential)]
 internal struct DROPFILES
@@ -289,6 +303,23 @@ internal static unsafe partial class NativeMethods
     [LibraryImport("user32.dll")]
     [return: MarshalAs(UnmanagedType.Bool)]
     public static partial bool EnumChildWindows(nint parent, delegate* unmanaged<nint, nint, int> callback, nint parameter);
+
+    [LibraryImport("user32.dll", EntryPoint = "FindWindowExW", StringMarshalling = StringMarshalling.Utf16)]
+    public static partial nint FindWindowEx(nint parent, nint after, string? className, string? windowName);
+
+    [LibraryImport("user32.dll")]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    public static partial bool IsWindowVisible(nint window);
+
+    [LibraryImport("user32.dll", EntryPoint = "GetClassNameW")]
+    public static partial int GetClassName(nint window, char* name, int size);
+
+    [LibraryImport("user32.dll")]
+    public static partial uint GetWindowThreadProcessId(nint window, out uint processId);
+
+    [LibraryImport("user32.dll")]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    public static partial bool GetGUIThreadInfo(uint threadId, ref GUITHREADINFO info);
 
     [LibraryImport("user32.dll")]
     [return: MarshalAs(UnmanagedType.Bool)]

@@ -117,11 +117,10 @@ To work on it in Xcode, open `macos/Package.swift`.
 
 ### How it works
 
-1. Start dragging files in File Explorer, attachments or messages in Outlook,
-   or an image in your browser, and carry them to the edge of the screen where
-   the shelf lives (the right edge unless you pick another). The shelf slides
-   in, out of the way of the pointer. Or press <kbd>Ctrl</kbd> <kbd>Alt</kbd>
-   <kbd>F</kbd> to bring it up yourself.
+1. Start dragging files in File Explorer or on the desktop, attachments or
+   messages in Outlook, or an image in your browser. The shelf slides in at the
+   edge of the screen, out of the way of the pointer. Or press
+   <kbd>Ctrl</kbd> <kbd>Alt</kbd> <kbd>F</kbd> to bring it up yourself.
 2. Drop them on the shelf.
 3. Switch to another desktop (<kbd>Ctrl</kbd> <kbd>Win</kbd> <kbd>←</kbd> /
    <kbd>→</kbd> or Task View). The shelf comes along.
@@ -160,13 +159,19 @@ in `%TEMP%` first; it's emptied the next time Ferry starts.
 - Settings (right-click the tray icon): show while dragging, the shortcut, the
   position, launch at login.
 
-Windows doesn't tell other apps when a drag begins, so **Show while dragging**
-works differently than on the Mac. Ferry watches the left mouse button with a
-low-level mouse hook, which needs no administrator rights. While the button is
-held down and moving, it puts an invisible 2-pixel drop target along the
-shelf's edge of every screen (both sides when the shelf sits next to the
-pointer or in a spot of your own). When a drag with files reaches it, the shelf
-slides in. The strips exist only mid-drag, so they never catch a click.
+Windows doesn't tell other apps when a drag begins, so Ferry watches the left
+mouse button with a low-level mouse hook, which needs no administrator rights.
+While the button is held down and moving, it looks for the drag image Windows
+draws under the pointer (File Explorer, the desktop and browsers draw one) or
+for OLE taking hold of the mouse, and slides the shelf in as soon as it sees
+either. That can also be a drag of text or a link; the shelf goes away again
+when such a drag ends. As a fallback, an invisible 2-pixel drop target waits
+along the shelf's edge of every screen (both sides when the shelf sits next to
+the pointer or in a spot of your own) and catches file drags that reach it.
+All of this exists only mid-drag, so it never catches a click.
+
+If something doesn't work, `%LOCALAPPDATA%\Ferry\Ferry.log` records what Ferry
+noticed along the way.
 
 ### Build and run
 
@@ -201,7 +206,7 @@ attaches the result to the run.
 | `windows/Ferry/App.xaml.cs` | Ties the shelf, tray icon, shortcut and drag watcher together |
 | `windows/Ferry/ShelfWindow.cs` | The shelf: drop zone, pile, file list, footer |
 | `windows/Ferry/ShelfController.cs` | Showing, hiding and positioning the shelf |
-| `windows/Ferry/DragWatcher.cs` | Notices file drags with a mouse hook and edge strips |
+| `windows/Ferry/DragWatcher.cs` | Notices file drags: mouse hook, drag image, edge strips |
 | `windows/Ferry/DroppedFiles.cs` | Reads dropped files, real and virtual |
 | `windows/Ferry/Interop/DropTarget.cs` | OLE drop target for the shelf and the edge strips |
 | `windows/Ferry/ShellFiles.cs` | Dragging files out, opening them, showing them in File Explorer |
@@ -209,6 +214,7 @@ attaches the result to the run.
 | `windows/Ferry/TrayIcon.cs`, `NativeMenu.cs` | Notification area icon and menus |
 | `windows/Ferry/HotKey.cs` | The global shortcut |
 | `windows/Ferry/SettingsWindow.cs`, `ShortcutRecorder.cs` | The settings window |
+| `windows/Ferry/Log.cs` | The diagnostic log |
 | `.github/workflows/windows.yml` | Builds and tests the Windows app |
 
 ## License

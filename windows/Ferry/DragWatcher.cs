@@ -10,26 +10,42 @@ namespace Ferry;
 /// Notices when the user drags files in any app. Windows has no global
 /// "a drag began" event, so Ferry watches the left mouse button with a
 /// low-level mouse hook, which needs no special permissions. While the button
-/// is held down and moving, thin invisible drop targets wait along the edge
-/// where the shelf lives; a file drag that reaches one brings the shelf up.
-/// They're only there mid-drag, so they never get in the way of clicks.
+/// is held down and moving, it looks for signs of a drag and drop under way:
+/// the drag image Windows draws for File Explorer, the desktop and browsers,
+/// or OLE's hidden window holding the mouse. Thin invisible drop targets along
+/// the shelf's edge catch any other file drag that reaches them. It's all only
+/// there mid-drag, so it never gets in the way of clicks.
 /// </summary>
 internal sealed class DragWatcher : IDisposable
 {
     /// <summary>Thick enough to catch a pointer thrown at the edge, thin enough to miss.</summary>
     private const double StripThickness = 2;
+    /// <summary>The window the shell draws a drag image in.</summary>
+    private const string DragImageClass = "SysDragImage";
+    /// <summary>OLE's hidden window, which holds the mouse while DoDragDrop runs.</summary>
+    private const string OleDragClass = "CLIPBRDWNDCLASS";
+    /// <summary>Enough unnoticed drags in the log to see why, without filling it.</summary>
+    private const int UnnoticedDragsToLog = 20;
 
     private readonly DispatcherQueue dispatcher;
+    private readonly DispatcherQueueTimer lookout;
     private readonly List<EdgeStrip> strips = [];
     private MouseHook? hook;
     private bool isArmed;
     private bool isDraggingFiles;
+    /// <summary>What held the mouse during this drag, for the log.</summary>
+    private string? captureClass;
+    private int unnoticedDragsLogged;
 
     public DragWatcher(DispatcherQueue dispatcher)
     {
         this.dispatcher = dispatcher;
+        lookout = dispatcher.CreateTimer();
+        lookout.Interval = TimeSpan.FromMilliseconds(50);
+        lookout.Tick += (_, _) => LookForDrag();
     }
 
+    /// <summary>A drag that probably carries files began in another app.</summary>
     public event Action? FileDragBegan;
     public event Action? FileDragEnded;
 
@@ -73,11 +89,12 @@ internal sealed class DragWatcher : IDisposable
             return;
         }
         isArmed = true;
+        captureClass = null;
         var scale = Monitors.ScaleAt(Monitors.Pointer());
         var rects = Position.DragStrips(Monitors.All(), Math.Round(StripThickness * scale)).ToList();
         while (strips.Count < rects.Count)
         {
-            strips.Add(new EdgeStrip(CanAccept, FileDragNoticed));
+            strips.Add(new EdgeStrip(CanAccept, () => DragNoticed("an edge strip")));
         }
         for (var index = 0; index < strips.Count; index++)
         {
@@ -90,11 +107,14 @@ internal sealed class DragWatcher : IDisposable
                 strips[index].Hide();
             }
         }
+        LookForDrag();
+        lookout.Start();
     }
 
     private void Disarm()
     {
         isArmed = false;
+        lookout.Stop();
         foreach (var strip in strips)
         {
             strip.Hide();
@@ -109,15 +129,71 @@ internal sealed class DragWatcher : IDisposable
             isDraggingFiles = false;
             FileDragEnded?.Invoke();
         }
+        else if (unnoticedDragsLogged < UnnoticedDragsToLog)
+        {
+            unnoticedDragsLogged++;
+            Log.Write($"A drag ended unnoticed; the mouse was held by {captureClass ?? "nothing"}");
+        }
     }
 
-    private void FileDragNoticed()
+    /// <summary>Runs every few milliseconds while the button is down and moving.</summary>
+    private void LookForDrag()
     {
+        if (isDraggingFiles || ShellFiles.IsDraggingOut)
+        {
+            lookout.Stop();
+            return;
+        }
+        if (IsDragImageShowing())
+        {
+            DragNoticed("the drag image");
+            return;
+        }
+        if (ForegroundCaptureClass() is { } capture)
+        {
+            captureClass = capture;
+            if (capture == OleDragClass)
+            {
+                DragNoticed("OLE holding the mouse");
+            }
+        }
+    }
+
+    private void DragNoticed(string how)
+    {
+        lookout.Stop();
         if (!isDraggingFiles)
         {
             isDraggingFiles = true;
+            Log.Write($"Drag noticed by {how}");
             FileDragBegan?.Invoke();
         }
+    }
+
+    private static bool IsDragImageShowing()
+    {
+        for (var window = FindWindowEx(0, 0, DragImageClass, null); window != 0; window = FindWindowEx(0, window, DragImageClass, null))
+        {
+            if (IsWindowVisible(window))
+            {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /// <summary>The class of the window that holds the mouse in the app being dragged from.</summary>
+    private static unsafe string? ForegroundCaptureClass()
+    {
+        var thread = GetWindowThreadProcessId(GetForegroundWindow(), out _);
+        var info = new GUITHREADINFO { Size = (uint)sizeof(GUITHREADINFO) };
+        if (thread == 0 || !GetGUIThreadInfo(thread, ref info) || info.Capture == 0)
+        {
+            return null;
+        }
+        var name = stackalloc char[64];
+        var length = GetClassName(info.Capture, name, 64);
+        return length > 0 ? new string(name, 0, length) : null;
     }
 
     /// <summary>Files from another app; the shelf's own drags don't count.</summary>
@@ -137,7 +213,7 @@ internal sealed class EdgeStrip : NativeWindow
     {
         // Fully transparent windows let the pointer through; one step above isn't.
         SetLayeredWindowAttributes(Handle, 0, 1, LWA_ALPHA);
-        dropTarget = new DropTarget { CanAccept = canAccept, TakesDrops = false };
+        dropTarget = new DropTarget { Name = "Edge strip", CanAccept = canAccept, TakesDrops = false };
         dropTarget.TargetingChanged += isTargeted =>
         {
             if (isTargeted)
@@ -203,6 +279,7 @@ internal sealed unsafe class MouseHook : IDisposable
     {
         threadId = GetCurrentThreadId();
         var hook = SetWindowsHookEx(WH_MOUSE_LL, &Callback, GetModuleHandle(null), 0);
+        Log.Write(hook != 0 ? "Mouse hook installed" : $"Mouse hook failed with error {Marshal.GetLastPInvokeError()}");
         started.Set();
         // The hook is called from this thread's message loop.
         while (GetMessage(out _, 0, 0, 0) > 0)
