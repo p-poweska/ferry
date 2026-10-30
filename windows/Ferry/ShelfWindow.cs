@@ -55,6 +55,12 @@ internal sealed partial class ShelfWindow : Window
 
     private bool isTargeted;
     private bool isExpanded;
+    /// <summary>Where a press that may turn into dragging files out began, in DIPs.</summary>
+    private Point? pressedAt;
+    /// <summary>The list row that press was on, or none for the pile.</summary>
+    private ListViewItem? pressedRow;
+    /// <summary>A drag out ends with a release that XAML may still read as a tap.</summary>
+    private bool skipsNextTap;
     private IReadOnlyCollection<string> draggingOut = [];
 
     public ShelfWindow(Shelf shelf)
@@ -75,7 +81,6 @@ internal sealed partial class ShelfWindow : Window
         list = new ListView
         {
             SelectionMode = ListViewSelectionMode.Extended,
-            CanDragItems = true,
             CanReorderItems = false,
             Padding = new Thickness(0, 4, 0, 4),
         };
@@ -147,21 +152,28 @@ internal sealed partial class ShelfWindow : Window
         zone.Tapped += OnZoneTapped;
         zone.DoubleTapped += OnZoneDoubleTapped;
         zone.RightTapped += OnZoneRightTapped;
-        zone.DragStarting += OnPileDragStarting;
-        list.DragItemsStarting += OnListDragItemsStarting;
+        // Rows handle their own presses, so listen to handled ones too.
+        zone.AddHandler(UIElement.PointerPressedEvent, new PointerEventHandler(OnZonePointerPressed), handledEventsToo: true);
+        zone.AddHandler(UIElement.PointerMovedEvent, new PointerEventHandler(OnZonePointerMoved), handledEventsToo: true);
+        zone.AddHandler(UIElement.PointerReleasedEvent, new PointerEventHandler((_, _) => pressedAt = null), handledEventsToo: true);
         list.SelectionChanged += (_, _) => RenderFooter();
         list.DoubleTapped += OnListDoubleTapped;
         list.RightTapped += OnListRightTapped;
         listButton.Click += (_, _) => SetExpanded(!ShowsList);
         closeButton.Click += (_, _) => CloseClicked?.Invoke();
 
-        dropTarget = new DropTarget { CanAccept = data => !ShellFiles.IsDraggingOut && DroppedFiles.HasFiles(data) };
+        dropTarget = new DropTarget { Name = "Shelf", CanAccept = data => !ShellFiles.IsDraggingOut && DroppedFiles.HasFiles(data) };
         dropTarget.TargetingChanged += isOn =>
         {
             isTargeted = isOn;
             Render();
         };
-        dropTarget.Dropped += data => shelf.Add(DroppedFiles.Read(data));
+        dropTarget.Dropped += data =>
+        {
+            var paths = DroppedFiles.Read(data);
+            Log.Write($"Shelf: {paths.Count} file(s) dropped");
+            shelf.Add(paths);
+        };
         dropTarget.Register(Handle);
 
         shelf.Changed += ItemsChanged;
@@ -300,7 +312,6 @@ internal sealed partial class ShelfWindow : Window
         list.Visibility = showsList ? Visibility.Visible : Visibility.Collapsed;
         badge.Visibility = count > 1 && !showsList ? Visibility.Visible : Visibility.Collapsed;
         badgeText.Text = count.ToString();
-        zone.CanDrag = count > 0 && !showsList;
 
         listButton.Visibility = count > 1 ? Visibility.Visible : Visibility.Collapsed;
         listIcon.Glyph = showsList ? PileGlyph : ListGlyph;
@@ -432,6 +443,11 @@ internal sealed partial class ShelfWindow : Window
 
     private void OnZoneTapped(object sender, TappedRoutedEventArgs e)
     {
+        if (skipsNextTap)
+        {
+            skipsNextTap = false;
+            return;
+        }
         // Clicking the pile lists the files.
         if (!ShowsList && shelf.Items.Count > 1)
         {
@@ -464,25 +480,59 @@ internal sealed partial class ShelfWindow : Window
         ShowMenu(commands);
     }
 
-    /// <summary>The pile drags everything at once.</summary>
-    private void OnPileDragStarting(UIElement sender, DragStartingEventArgs args)
+    // MARK: - Dragging out
+
+    private void OnZonePointerPressed(object sender, PointerRoutedEventArgs e)
     {
-        args.Cancel = true;
-        DragOut(shelf.Paths.ToList());
+        pressedAt = null;
+        var point = e.GetCurrentPoint(root);
+        if (!point.Properties.IsLeftButtonPressed || shelf.IsEmpty)
+        {
+            return;
+        }
+        // In the list, only a row starts a drag, not the scroll bar or the gaps.
+        pressedRow = ShowsList ? RowAt(e.OriginalSource) : null;
+        if (!ShowsList || pressedRow is not null)
+        {
+            pressedAt = point.Position;
+            skipsNextTap = false;
+        }
+    }
+
+    /// <summary>
+    /// The pile drags everything at once. Dragging a selected row takes the
+    /// whole selection along, in list order; any other row goes on its own.
+    /// </summary>
+    private void OnZonePointerMoved(object sender, PointerRoutedEventArgs e)
+    {
+        if (pressedAt is not { } start)
+        {
+            return;
+        }
+        var point = e.GetCurrentPoint(root);
+        if (!point.Properties.IsLeftButtonPressed)
+        {
+            pressedAt = null;
+            return;
+        }
+        var scale = GetDpiForWindow(Handle) / 96.0;
+        var threshold = GetSystemMetrics(SM_CXDRAG) / scale;
+        if (Math.Abs(point.Position.X - start.X) <= threshold && Math.Abs(point.Position.Y - start.Y) <= threshold)
+        {
+            return;
+        }
+        pressedAt = null;
+        skipsNextTap = true;
+        var paths = pressedRow switch
+        {
+            null => shelf.Paths.ToList(),
+            { IsSelected: true } => SelectedPaths().ToList(),
+            var row => [PathOf(row)],
+        };
+        DragOut(paths);
     }
 
     // MARK: - File list
-
-    /// <summary>
-    /// Dragging a selected row takes the whole selection along, in list
-    /// order; any other row goes on its own.
-    /// </summary>
-    private void OnListDragItemsStarting(object sender, DragItemsStartingEventArgs e)
-    {
-        e.Cancel = true;
-        var dragged = e.Items.ToHashSet();
-        DragOut(list.Items.Where(dragged.Contains).OfType<ListViewItem>().Select(PathOf).ToList());
-    }
 
     private void OnListDoubleTapped(object sender, DoubleTappedRoutedEventArgs e)
     {
@@ -547,8 +597,8 @@ internal sealed partial class ShelfWindow : Window
     }
 
     /// <summary>
-    /// Hands the drag XAML just detected to File Explorer's own drag and drop,
-    /// which moves or copies files like a drag out of a folder window.
+    /// Drags files out with File Explorer's own drag and drop, which moves or
+    /// copies them like a drag out of a folder window.
     /// </summary>
     private void DragOut(IReadOnlyList<string> paths)
     {
@@ -556,7 +606,7 @@ internal sealed partial class ShelfWindow : Window
         {
             return;
         }
-        // Let XAML finish cancelling its drag before starting the real one.
+        // Start it once XAML is done with the pointer event that asked for it.
         DispatcherQueue.TryEnqueue(() =>
         {
             draggingOut = paths;

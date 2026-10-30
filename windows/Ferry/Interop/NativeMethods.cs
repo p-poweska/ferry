@@ -52,6 +52,16 @@ internal struct MSLLHOOKSTRUCT
     public nuint ExtraInfo;
 }
 
+/// <summary>The header of a CF_HDROP block; the paths follow it.</summary>
+[StructLayout(LayoutKind.Sequential)]
+internal struct DROPFILES
+{
+    public uint FilesOffset;
+    public POINT Point;
+    public int NonClient;
+    public int Wide;
+}
+
 [StructLayout(LayoutKind.Sequential)]
 internal unsafe struct WNDCLASSEXW
 {
@@ -221,6 +231,11 @@ internal static unsafe partial class NativeMethods
 
     [LibraryImport("kernel32.dll")]
     public static partial nuint GlobalSize(nint memory);
+
+    [LibraryImport("kernel32.dll")]
+    public static partial nint GlobalAlloc(uint flags, nuint size);
+
+    public const uint GHND = 0x0042;
 
     // Windows.
 
@@ -423,6 +438,9 @@ internal static unsafe partial class NativeMethods
 
     [LibraryImport("shell32.dll")]
     public static partial void ILFree(nint itemList);
+
+    [LibraryImport("shell32.dll")]
+    public static partial nint ILFindLastID(nint itemList);
 
     [LibraryImport("shell32.dll")]
     public static partial int SHCreateDataObject(nint folder, uint count, nint* items, nint inner, in Guid interfaceId, out nint dataObject);

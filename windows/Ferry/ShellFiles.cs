@@ -60,38 +60,101 @@ internal static unsafe class ShellFiles
     /// </summary>
     public static uint DragOut(nint window, IReadOnlyList<string> paths)
     {
-        var items = paths.Select(ILCreateFromPath).Where(item => item != 0).ToArray();
-        if (items.Length == 0)
+        var data = CreateDataObject(paths);
+        if (data == 0)
         {
+            Log.Write($"Couldn't make a drag for {paths.Count} file(s)");
             return DROPEFFECT_NONE;
         }
+        IsDraggingOut = true;
         try
         {
-            nint data;
-            fixed (nint* list = items)
+            var result = SHDoDragDrop(window, data, 0, DROPEFFECT_COPY | DROPEFFECT_MOVE | DROPEFFECT_LINK, out var effect);
+            Log.Write($"Dragged {paths.Count} file(s) out: result 0x{result:X8}, effect {effect}");
+            return result >= 0 ? effect : DROPEFFECT_NONE;
+        }
+        finally
+        {
+            IsDraggingOut = false;
+            Marshal.Release(data);
+        }
+    }
+
+    /// <summary>
+    /// The data object File Explorer itself would make for these files: from
+    /// their folder when they share one, which also brings Explorer's drag
+    /// image, or else a plain list of paths (CF_HDROP).
+    /// </summary>
+    private static nint CreateDataObject(IReadOnlyList<string> paths)
+    {
+        var folders = paths.Select(Path.GetDirectoryName).Distinct(StringComparer.OrdinalIgnoreCase).ToList();
+        if (folders is [{ } folder] && FromFolder(folder, paths) is not 0 and var fromFolder)
+        {
+            return fromFolder;
+        }
+        if (SHCreateDataObject(0, 0, null, 0, DataObjectInterface, out var data) < 0)
+        {
+            return 0;
+        }
+        var wrapper = ComInterop.Wrap<IDataObject>(data);
+        try
+        {
+            var medium = new STGMEDIUM { Tymed = TYMED_HGLOBAL, Handle = FileList(paths) };
+            if (wrapper.SetData(FORMATETC.For(CF_HDROP), medium, release: true) >= 0)
             {
-                if (SHCreateDataObject(0, (uint)items.Length, list, 0, DataObjectInterface, out data) < 0)
-                {
-                    return DROPEFFECT_NONE;
-                }
+                return data;
             }
-            IsDraggingOut = true;
-            try
+            ReleaseStgMedium(ref medium);
+            Marshal.Release(data);
+            return 0;
+        }
+        finally
+        {
+            ComInterop.Release(wrapper);
+        }
+    }
+
+    /// <summary>A data object for files in one folder, built from the folder and each file's last ID.</summary>
+    private static nint FromFolder(string folder, IReadOnlyList<string> paths)
+    {
+        var parent = ILCreateFromPath(folder);
+        var items = paths.Select(ILCreateFromPath).ToArray();
+        try
+        {
+            if (parent == 0 || items.Contains(0))
             {
-                return SHDoDragDrop(window, data, 0, DROPEFFECT_COPY | DROPEFFECT_MOVE | DROPEFFECT_LINK, out var effect) >= 0
-                    ? effect
-                    : DROPEFFECT_NONE;
+                return 0;
             }
-            finally
+            var children = items.Select(ILFindLastID).ToArray();
+            fixed (nint* list = children)
             {
-                IsDraggingOut = false;
-                Marshal.Release(data);
+                return SHCreateDataObject(parent, (uint)children.Length, list, 0, DataObjectInterface, out var data) >= 0 ? data : 0;
             }
         }
         finally
         {
+            ILFree(parent);
             Array.ForEach(items, ILFree);
         }
+    }
+
+    /// <summary>A DROPFILES block: the header, then each path, then an empty one.</summary>
+    private static nint FileList(IReadOnlyList<string> paths)
+    {
+        var text = string.Concat(paths.Select(path => path + "\0")) + "\0";
+        var size = sizeof(DROPFILES) + text.Length * sizeof(char);
+        var memory = GlobalAlloc(GHND, (nuint)size);
+        var bytes = (byte*)GlobalLock(memory);
+        try
+        {
+            *(DROPFILES*)bytes = new DROPFILES { FilesOffset = (uint)sizeof(DROPFILES), Wide = 1 };
+            text.AsSpan().CopyTo(new Span<char>(bytes + sizeof(DROPFILES), text.Length));
+        }
+        finally
+        {
+            GlobalUnlock(memory);
+        }
+        return memory;
     }
 }
 
