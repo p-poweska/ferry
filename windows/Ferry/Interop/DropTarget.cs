@@ -24,6 +24,9 @@ internal sealed unsafe partial class DropTarget : IDropTarget, IDisposable
     /// <summary>Whether to take what's being dragged. Asked again as the drag moves until it says yes.</summary>
     public required Func<IDataObject, bool> CanAccept { get; init; }
 
+    /// <summary>What the log calls it.</summary>
+    public string Name { get; init; } = "Drop target";
+
     /// <summary>A target that only notices drags tells the source it won't take them.</summary>
     public bool TakesDrops { get; init; } = true;
 
@@ -91,6 +94,7 @@ internal sealed unsafe partial class DropTarget : IDropTarget, IDisposable
         ReleaseCurrent();
         current = ComInterop.Wrap<IDataObject>(dataObject);
         isAccepted = CanAccept(current);
+        Log.Write($"{Name}: a drag came in, {(isAccepted ? "with" : "without")} files");
         effect = Effect(effect);
         helper?.DragEnter(owner, dataObject, point, effect);
         if (isAccepted)

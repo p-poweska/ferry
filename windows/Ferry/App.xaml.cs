@@ -27,10 +27,12 @@ public partial class App : Application
         InitializeComponent();
         // Ferry lives in the tray; closing the settings window mustn't quit it.
         DispatcherShutdownMode = DispatcherShutdownMode.OnExplicitShutdown;
+        UnhandledException += (_, args) => Log.Write($"Crashed: {args.Exception}");
     }
 
     protected override void OnLaunched(LaunchActivatedEventArgs args)
     {
+        Log.Start();
         Inbox.Temporary.Empty();
         NativeMenu.AllowDarkMode();
         var dispatcher = DispatcherQueue.GetForCurrentThread();
