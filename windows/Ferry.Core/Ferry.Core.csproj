@@ -1,0 +1,7 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!-- Everything that doesn't need Windows, so it can be tested anywhere. -->
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+  </PropertyGroup>
+</Project>
