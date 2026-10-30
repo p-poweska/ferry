@@ -1,6 +1,6 @@
 #!/usr/bin/env swift
-// Draws the Ferry app icon. Writes Resources/AppIcon.icns for the Mac app and
-// the shared ../Resources/AppIcon.png.
+// Draws the Ferry app icon. Writes Resources/AppIcon.icns for the Mac app, the
+// shared ../Resources/AppIcon.png and ../windows/Ferry/Assets/Ferry.ico.
 // Usage (from macos/): swift scripts/make-icon.swift
 import AppKit
 
@@ -114,4 +114,34 @@ iconutil.arguments = ["-c", "icns", iconset.path, "-o", output.path]
 try iconutil.run()
 iconutil.waitUntilExit()
 try png(pixels: 512).write(to: root.appendingPathComponent("../Resources/AppIcon.png").standardizedFileURL)
-print("Wrote \(output.path)")
+
+/// A Windows icon holding PNG images, which Windows reads since Vista.
+func ico(sizes: [Int]) -> Data {
+    let images = sizes.map { png(pixels: $0) }
+    var data = Data()
+    func append<T: FixedWidthInteger>(_ value: T) {
+        withUnsafeBytes(of: value.littleEndian) { data.append(contentsOf: $0) }
+    }
+    append(UInt16(0))
+    append(UInt16(1))
+    append(UInt16(images.count))
+    var offset = 6 + 16 * images.count
+    for (size, image) in zip(sizes, images) {
+        append(UInt8(size >= 256 ? 0 : size))
+        append(UInt8(size >= 256 ? 0 : size))
+        append(UInt8(0))
+        append(UInt8(0))
+        append(UInt16(1))
+        append(UInt16(32))
+        append(UInt32(image.count))
+        append(UInt32(offset))
+        offset += image.count
+    }
+    images.forEach { data.append($0) }
+    return data
+}
+
+let windowsIcon = root.appendingPathComponent("../windows/Ferry/Assets/Ferry.ico").standardizedFileURL
+try FileManager.default.createDirectory(at: windowsIcon.deletingLastPathComponent(), withIntermediateDirectories: true)
+try ico(sizes: [16, 20, 24, 32, 40, 48, 64, 256]).write(to: windowsIcon)
+print("Wrote \(output.path) and \(windowsIcon.path)")
