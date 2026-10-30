@@ -1,0 +1,35 @@
+name: Windows
+
+on:
+  push:
+    branches: [main]
+    paths: ["windows/**", ".github/workflows/windows.yml"]
+  pull_request:
+    paths: ["windows/**", ".github/workflows/windows.yml"]
+  workflow_dispatch:
+
+jobs:
+  build:
+    # WinUI needs Windows to build: the XAML compiler and resource tools only run there.
+    runs-on: windows-latest
+    strategy:
+      matrix:
+        platform: [x64, ARM64]
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-dotnet@v6
+        with:
+          dotnet-version: 10.0.x
+
+      - name: Test the shared code
+        if: matrix.platform == 'x64'
+        run: dotnet test windows/Ferry.Core.Tests --configuration Release
+
+      - name: Build the app
+        run: dotnet publish windows/Ferry/Ferry.csproj --configuration Release -p:Platform=${{ matrix.platform }} --output publish/Ferry
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: Ferry-windows-${{ matrix.platform }}
+          path: publish/Ferry
